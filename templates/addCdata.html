@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Add College{% endblock %}
+{% block contents %}
+<form action="{{ url_for('add_college') }}" method="POST">
+    
+    <div class="input-group">
+        <label for="college_name"> College Name:  </label>
+        <input type="text" id="college_name" name="college_name" required>        
+    </div>
+<br>
+    <div class="input-group">
+        <label for="address"> Location: </label>
+        <input type="text" id="address" name="location">
+    </div>
+    
+    <a href="/add_college"><button type = 'submit'> Add College </button></a>
+    
+</form>
+{% endblock %}

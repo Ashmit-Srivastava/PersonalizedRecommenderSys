@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}View Query{% endblock %}
+{% block contents %}
+    {% for items in values %}
+        <p>Name: {{items.name}}, Email: {{items.email}}</p>
+    {% endfor %}
+{% endblock %}

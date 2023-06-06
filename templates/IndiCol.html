@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}College Info{% endblock %}
+{% block contents %}    
+    {% if iits %}
+        <h1>{{ iits.name }}</h1>
+        {% if iits.location != 'NA' %}
+            <p>This College is located at {{iits.location}}</p>
+        {% else %}
+            <p>We do not have the location of this College in our Database Currently</p>
+        {% endif %}
+    {% endif %}
+{% endblock %}
