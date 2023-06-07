@@ -2,6 +2,7 @@ from flask import Flask, redirect, url_for, render_template, request, session, f
 from datetime import timedelta
 # import pyrebase
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import func
 # from flask_migrate import Migrate
 
 app = Flask(__name__)
@@ -122,7 +123,7 @@ def dynamicRoute(num):
         if iit:
             return render_template("IndiCol.html", iits=iit)
         else:
-            # flash(f"We dont have this College in our list!!!")
+            flash(f"We dont have this College in our list!!!")
             return redirect(url_for("iit_list"))
     else:
         flash(f"You are not logged in!!!")
@@ -137,10 +138,11 @@ def addCollege():
 def add_college():
     if "user" in session:
         if request.method == "POST":
-            college_name = request.form["college_name"]
+            college_name = request.form["college_name"].lower()
             college_location = request.form["location"]
 
-            existing_college = IIT.query.filter_by(name=college_name).first()
+            existing_college = IIT.query.filter(func.lower(func.replace(IIT.name, ' ', '')) == func.lower(func.replace(college_name, ' ', ''))).first()
+            
             if existing_college:
                 if college_location:
                      existing_college.location = college_location
@@ -161,8 +163,6 @@ def add_college():
     else:
         flash("You are not logged in!")
         return redirect(url_for("login"))
-
-
 
 
 
