@@ -1,9 +1,14 @@
+import os
 from flask import Flask, redirect, url_for, render_template, request, session, flash, jsonify
-from datetime import timedelta
+from datetime import timedelta, datetime
 # import pyrebase
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
+from sqlalchemy.orm import relationship
+import pandas as pd
+import uuid
 # from flask_migrate import Migrate
+
 
 app = Flask(__name__)
 app.secret_key = "Avricus"
@@ -71,16 +76,16 @@ def login():
         
         return render_template("login.html")
 
-@app.route("/user", methods = ["POST", "GET"])
+@app.route("/user", methods=["POST", "GET"])
 def user():
     email = None
     if "user" in session:
         user = session["user"]
-        
+
         if request.method == "POST":
             email = request.form["email"]
             session["email"] = email
-            found_user = users.query.filter_by(name = user).first()
+            found_user = users.query.filter_by(name=user).first()
             found_user.email = email
             db.session.commit()
             flash("Email was saved!!!")
@@ -88,7 +93,7 @@ def user():
             if "email" in session:
                 email = session["email"]
 
-        return render_template("user.html", email = email)
+        return render_template("user.html", email=email)
     else:
         flash(f"You are not logged in!!!")
         return redirect(url_for("login"))
@@ -113,16 +118,6 @@ def iit_list():
         flash(f"You are not logged in!!!")
         return redirect(url_for("login"))
 
-def add_iit_names(iits):
-    with app.app_context():
-        
-        # db.session.query(IIT).delete()
-
-        for name in iits:
-            iit = IIT(name = name)
-            db.session.add(iit)
-
-        db.session.commit()
 
 @app.route("/college/<int:num>")
 def dynamicRoute(num):
@@ -131,41 +126,55 @@ def dynamicRoute(num):
         if iit:
             return render_template("IndiCol.html", iits=iit)
         else:
-            flash(f"We dont have this College in our list!!!")
-            return redirect(url_for("iit_list"))
+            flash(f"We dont have this College in our database!!!")
+            return render_template("error.html", error_message="Page not found", back_url=url_for("iit_list"))
     else:
         flash(f"You are not logged in!!!")
         return redirect(url_for("login")) 
 
+@app.errorhandler(404)
+def page_not_found(error):
+    
+    return render_template('error.html', error_message="Page not found", back_url=url_for('iit_list')), 404
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    return render_template("error.html", error_message="Internal Server Error", back_url=url_for("iit_list")), 500
+
 @app.route("/addCollege")
 def addCollege():
-    return render_template("addCdata.html")
+    states = City.query.all()
+    return render_template("addCdata.html", states=states)
 
 
 @app.route("/add_college", methods=["POST"])
 def add_college():
     if "user" in session:
         if request.method == "POST":
-            college_name = request.form["college_name"].lower()
+            college_name = request.form["college_name"]
             college_location = request.form["location"]
+            # new_city = request.form["new_city"]
+
+            if college_location:
+                # Use the selected city from the dropdown
+                location = college_location
+            # elif new_city:
+                # Use the new city entered by the user
+                # location = new_city
+            else:
+                # No location specified
+                location = None
 
             existing_college = IIT.query.filter(func.lower(func.replace(IIT.name, ' ', '')) == func.lower(func.replace(college_name, ' ', ''))).first()
             if existing_college:
-                if college_location:
-                     existing_college.location = college_location
-                elif existing_college.location == 'NA':
-                    existing_college.location = college_location
+                existing_college.location = location
                 db.session.commit()
             else:
-                if college_location:
-                    iit = IIT(name=college_name, location=college_location)
-                else:
-                    iit = IIT(name=college_name)
-
+                iit = IIT(name=college_name, location=location)
                 db.session.add(iit)
                 db.session.commit()
 
-            flash("College added successfully!")
+            flash("College added/updated successfully!")
             return redirect(url_for("iit_list"))
     else:
         flash("You are not logged in!")
@@ -173,6 +182,24 @@ def add_college():
 
 
 
+@app.route("/populate_cities")
+def populate_cities():
+    existing_states = City.query.all()
+
+    df = pd.read_excel("C:/Users/ashmi/OneDrive/Desktop/Avricus PS1/Flask/cities/states.xlsx")
+    states = df["State"].tolist()
+
+    # Remove existing states from the database
+    for state in existing_states:
+        db.session.delete(state)
+
+    # Add the new states
+    for state in states:
+        db.session.add(City(name=state))
+
+    db.session.commit()
+    flash("States updated successfully!")
+    return redirect(url_for("addCollege"))
 
 
 
@@ -180,8 +207,5 @@ if __name__ == "__main__":
    
     with app.app_context():
         db.create_all()
-
-    # iit_names = ['IIT Bombay','IIT Delhi','IIT Madras','IIT Kanpur','IIT Kharagpur','IIT Roorkee','IIT Guwahati','IIT Hyderabad','IIT Indore','IIT Varanasi (BHU)','IIT Dhanbad','IIT Bhubaneswar','IIT Gandhinagar','IIT Ropar','IIT Patna','IIT Mandi','IIT Jodhpur','IIT Palakkad','IIT Tirupati','IIT Bhilai','IIT Goa','IIT Jammu','IIT Dharwad']
-    # add_iit_names(iit_names)
 
     app.run(debug=True)

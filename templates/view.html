@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block title %}View Query{% endblock %}
 {% block contents %}
+    <h1>User Log File</h1>
+    <pre>Login: <br>{{ log_content }}</pre>
+    <hr>
     {% for items in values %}
         <p>Name: {{items.name}}, Email: {{items.email}}</p>
     {% endfor %}
