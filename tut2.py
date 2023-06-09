@@ -29,30 +29,31 @@ class users(db.Model):
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(100))
     uuid = db.Column(db.String(36), unique=True, nullable=False)
-    # timestamp = db.Column(db.String(100))
-    logins = relationship('Login', backref='user')
+    timestamp = db.Column(db.String(100))
 
     def __init__(self, name, email):
         self.name = name
         self.email = email
         self.uuid = str(uuid.uuid4())
-        # self.timestamp = ""
+        self.timestamp = ""
 
-    # def add_login_timestamp(self):
-    #     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    #     if self.timestamp:
-    #         self.timestamp += f",{now}"
-    #     else:
-    #         self.timestamp = now
-    #     self.update_logs_file()  # Update the logs file immediately after adding the timestamp
+    def add_login_timestamp(self):
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if self.timestamp:
+            self.timestamp += f",{now}"
+            
+        else:
+            self.timestamp = now
+        self.update_logs_file()  # Update the logs file immediately after adding the timestamp
 
-    # def get_login_timestamps(self):
-    #     return self.timestamp.split(",") if self.timestamp else []
+    def get_login_timestamps(self):
+        return self.timestamp.split(",") if self.timestamp else []
 
-    # def update_logs_file(self):
-    #     logs_file_path = os.path.join(os.path.dirname(__file__), "logs.txt")
-    #     with open(logs_file_path, "a") as file:
-    #         file.write(f"{self.name}: {self.get_login_timestamps()}\n")
+    def update_logs_file(self):
+        logs_file_path = os.path.join(os.path.dirname(__file__), "logs.txt")
+        with open(logs_file_path, "a") as file:
+            file.write(f"{self.name}: {self.get_login_timestamps()}\nEmail: {self.email}\n")
+            
 
 class City(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -181,14 +182,11 @@ def add_college():
         if request.method == "POST":
             college_name = request.form["college_name"]
             college_location = request.form["location"]
-            # new_city = request.form["new_city"]
+            
 
             if college_location:
                 # Use the selected city from the dropdown
                 location = college_location
-            # elif new_city:
-                # Use the new city entered by the user
-                # location = new_city
             else:
                 # No location specified
                 location = None

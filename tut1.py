@@ -9,12 +9,11 @@ import pandas as pd
 import uuid
 # from flask_migrate import Migrate
 
-
 app = Flask(__name__)
 app.secret_key = "Avricus"
-app.permanent_session_lifetime = timedelta(minutes=5)
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///iit3.db'  # Change the database URL as per your preference
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.sqlite3'
+app.permanent_session_lifetime = timedelta(hours=5)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///iit3.db'  # Change the database URL as per your preference
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.sqlite3'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app) 
@@ -29,10 +28,31 @@ class users(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(100))
+    uuid = db.Column(db.String(36), unique=True, nullable=False)
+    timestamp = db.Column(db.String(100))
 
     def __init__(self, name, email):
         self.name = name
         self.email = email
+        self.uuid = str(uuid.uuid4())
+        self.timestamp = ""
+
+    def add_login_timestamp(self):
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if self.timestamp:
+            self.timestamp += f",{now}"
+            
+        else:
+            self.timestamp = now
+        self.update_logs_file()  # Update the logs file immediately after adding the timestamp
+
+    def get_login_timestamps(self):
+        return self.timestamp.split(",") if self.timestamp else []
+
+    def update_logs_file(self):
+        logs_file_path = os.path.join(os.path.dirname(__file__), "logs_final.txt")
+        with open(logs_file_path, "a") as file:
+            file.write(f"{self.name}: {self.get_login_timestamps()}\n")
 
 class City(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -42,13 +62,18 @@ class City(db.Model):
         self.name = name
 
 
+
 @app.route("/home")
 def home():
     return render_template("index.html", contents = "Testing")
 
 @app.route("/view")
-def view():
-    return render_template("view.html", values = users.query.all())
+def view_logs():
+    logs_file_path = os.path.join(app.root_path, "logs.txt")
+    with open(logs_file_path, "r") as file:
+        log_content = file.read()
+
+    return render_template("view.html", log_content=log_content)
 
 @app.route("/login", methods = ["POST", "GET"])
 def login():
@@ -64,8 +89,11 @@ def login():
         else: 
             usr = users(user, "")
             db.session.add(usr)
-            db.session.commit()
-
+            
+        # Update the timestamp and save the details
+        found_user.add_login_timestamp()
+        db.session.commit()
+        
 
         flash(f"Login Successful!!!")
         return redirect(url_for("user"))
@@ -153,14 +181,11 @@ def add_college():
         if request.method == "POST":
             college_name = request.form["college_name"]
             college_location = request.form["location"]
-            # new_city = request.form["new_city"]
+            
 
             if college_location:
                 # Use the selected city from the dropdown
                 location = college_location
-            # elif new_city:
-                # Use the new city entered by the user
-                # location = new_city
             else:
                 # No location specified
                 location = None
@@ -179,6 +204,7 @@ def add_college():
     else:
         flash("You are not logged in!")
         return redirect(url_for("login"))
+
 
 
 
