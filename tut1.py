@@ -12,12 +12,14 @@ import uuid
 app = Flask(__name__)
 app.secret_key = "Avricus"
 app.permanent_session_lifetime = timedelta(hours=5)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///iit3.db'  # Change the database URL as per your preference
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.sqlite3'
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///iit3.db'  # Change the database URL as per your preference
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.sqlite3'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 
 db = SQLAlchemy(app) 
 # migrate = Migrate(app, db)
+
 
 class IIT(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -52,7 +54,7 @@ class users(db.Model):
     def update_logs_file(self):
         logs_file_path = os.path.join(os.path.dirname(__file__), "logs_final.txt")
         with open(logs_file_path, "a") as file:
-            file.write(f"{self.name}: {self.get_login_timestamps()}\n")
+            file.write(f"{self.name}: {self.get_login_timestamps()}\nEmail: {self.email}\n")
 
 class City(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -69,11 +71,12 @@ def home():
 
 @app.route("/view")
 def view_logs():
-    logs_file_path = os.path.join(app.root_path, "logs.txt")
+    email = session.get("email", "")
+    logs_file_path = os.path.join(app.root_path, "logs_final.txt")
     with open(logs_file_path, "r") as file:
         log_content = file.read()
 
-    return render_template("view.html", log_content=log_content)
+    return render_template("view.html", log_content=log_content, email=email)
 
 @app.route("/login", methods = ["POST", "GET"])
 def login():
@@ -82,13 +85,20 @@ def login():
         user = request.form["name"]
         session["user"] = user
 
+        # name = request.form["name"]
+        email = request.form["email"]
+        # session["user"] = name
+        session["email"] = email
+
 
         found_user = users.query.filter_by(name = user).first()
         if found_user:
             session["email"] = found_user.email
         else: 
-            usr = users(user, "")
-            db.session.add(usr)
+            # usr = users(user, "")
+            found_user = users(name=user, email=email)
+            db.session.add(found_user)
+            db.session.commit()
             
         # Update the timestamp and save the details
         found_user.add_login_timestamp()

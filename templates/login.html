@@ -11,6 +11,8 @@
 <form actions = "#" method="post">
     <p>Name: </p>
     <p><input type="text" name="name"></p>
+    <p><label for="email">Your Email: </label></p>
+    <input type="email" id="email" name="email" placeholder="Enter Email" value="{{email if email}}">
     <p><input type="submit" value="Submit"></p>
 </form>
 {% endblock %}
