@@ -7,19 +7,20 @@ from sqlalchemy import func
 from sqlalchemy.orm import relationship
 import pandas as pd
 import uuid
+from werkzeug.security import generate_password_hash
 # from flask_migrate import Migrate
 
 app = Flask(__name__)
 app.secret_key = "Avricus"
 app.permanent_session_lifetime = timedelta(hours=5)
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///iit3.db'  # Change the database URL as per your preference
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.sqlite3'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.sqlite3'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///KC.db'
 
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app) 
 # migrate = Migrate(app, db)
-
 
 class IIT(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -30,31 +31,40 @@ class users(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(100))
+    password = db.Column(db.String(100), nullable=False)
+    role = db.Column(db.String(20), nullable=False)
     uuid = db.Column(db.String(36), unique=True, nullable=False)
     timestamp = db.Column(db.String(100))
+    register_date = db.Column(db.DateTime, default=datetime.utcnow)
 
-    def __init__(self, name, email):
+    def __init__(self, name, email, password, role):
         self.name = name
         self.email = email
+        self.password = password
+        self.role = role
         self.uuid = str(uuid.uuid4())
         self.timestamp = ""
 
-    def add_login_timestamp(self):
+    def add_login_timestamp(self, source=None):
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         if self.timestamp:
-            self.timestamp += f",{now}"
+            self.timestamp = f"{now}"
             
         else:
             self.timestamp = now
-        self.update_logs_file()  # Update the logs file immediately after adding the timestamp
+
+        if source == 'login':
+            self.update_login_logs_file()  # Update the login log file
+                
 
     def get_login_timestamps(self):
         return self.timestamp.split(",") if self.timestamp else []
 
-    def update_logs_file(self):
-        logs_file_path = os.path.join(os.path.dirname(__file__), "Logs/logs_final.txt")
+    def update_login_logs_file(self):
+        logs_file_path = os.path.join(os.path.dirname(__file__), "Logs/rLoginLogs.txt")
         with open(logs_file_path, "a") as file:
             file.write(f"{self.name}: {self.get_login_timestamps()}\nEmail: {self.email}\n")
+            
 
 class City(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -72,47 +82,69 @@ def home():
 @app.route("/view")
 def view_logs():
     email = session.get("email", "")
-    logs_file_path = os.path.join(app.root_path, "Logs/logs_final.txt")
+    logs_file_path = os.path.join(app.root_path, "Logs/rLoginLogs.txt")
     with open(logs_file_path, "r") as file:
         log_content = file.read()
 
     return render_template("view.html", log_content=log_content, email=email)
 
-@app.route("/login", methods = ["POST", "GET"])
+@app.route("/login", methods=["POST", "GET"])
 def login():
     if request.method == "POST":
         session.permanent = True
         user = request.form["name"]
         session["user"] = user
 
-        # name = request.form["name"]
-        email = request.form["email"]
-        # session["user"] = name
-        session["email"] = email
+        password = request.form["password"]
+        session["password"] = password
 
-
-        found_user = users.query.filter_by(name = user).first()
+        # Check if the user exists in the database
+        found_user = users.query.filter_by(name=user).first()
         if found_user:
-            session["email"] = found_user.email
-        else: 
-            # usr = users(user, "")
-            found_user = users(name=user, email=email)
-            db.session.add(found_user)
-            db.session.commit()
-            
-        # Update the timestamp and save the details
-        found_user.add_login_timestamp()
-        db.session.commit()
-        
-
-        flash(f"Login Successful!!!")
-        return redirect(url_for("user"))
+            # Verify the password
+            if found_user.password == generate_password_hash(password):
+                session["email"] = found_user.email
+                # Update the login timestamp and save the details
+                found_user.add_login_timestamp('login')
+                db.session.commit()
+                flash("Login Successful!")
+                return redirect(url_for("user"))
+            else:
+                flash("Invalid username or password!")
+                return redirect(url_for("login"))
+        else:
+            flash("Invalid username or password!")
+            return redirect(url_for("login"))
     else:
         if "user" in session:
-            flash(f"You are already Logged In!!!")
+            flash("You are already logged in!")
             return redirect(url_for("user"))
         
         return render_template("login.html")
+
+
+@app.route("/register", methods=["POST", "GET"])
+def register():
+    if request.method == "POST":
+        name = request.form["name"]
+        email = request.form["email"]
+        password = request.form["password"]
+        role = request.form["role"]
+
+        existing_user = users.query.filter_by(email=email).first()
+        if existing_user:
+            flash("Email already exists. Please log in.")
+            return redirect(url_for("login"))
+
+        new_user = users(name=name, email=email, password=generate_password_hash(password), role=role)
+        db.session.add(new_user)
+        db.session.commit()
+
+        flash("Registration successful! Please log in.")
+        return redirect(url_for("login"))
+    else:
+        return render_template("register.html")
+
 
 @app.route("/user", methods=["POST", "GET"])
 def user():
@@ -145,6 +177,7 @@ def logout():
         flash(f"You are not logged in!!! LOGIN First ;)", "info")
     session.pop("user", None)
     session.pop("email", None)
+    session.pop("password", None)
     return redirect(url_for("login"))
 
 @app.route('/')
@@ -187,7 +220,7 @@ def addCollege():
 
 def update_crud_logs_file(user, email, data_dict, operation):
     log_entry = f"The User has performed a {operation} Operation. User: {user}, Email: {email}, Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}, College Name: {data_dict['college_name']}, College Location: {data_dict['college_location']}\n\n"
-    log_file_path = os.path.join(os.path.dirname(__file__), "Logs/CRUDlog_final.txt")
+    log_file_path = os.path.join(os.path.dirname(__file__), "Logs/rLoginCRUD.txt")
     with open(log_file_path, "a") as file:
         file.write(log_entry)
 
@@ -220,14 +253,12 @@ def add_college():
                 data_dict = {'college_name':college_name, 'college_location':college_location}
                 update_crud_logs_file(user=session["user"], email=session["email"], data_dict=data_dict, operation='Create')  #CRUD Operations log file update
 
-
+            
             flash("College added/updated successfully!")
             return redirect(url_for("iit_list"))
     else:
         flash("You are not logged in!")
         return redirect(url_for("login"))
-
-
 
 
 @app.route("/populate_cities")

@@ -1,0 +1,13 @@
+The User has performed a Create Operation 
+User: TUser5
+Email: User@test5.com
+Timestamp: 2023-06-11 17:34:07
+College Name: VIT
+College Location: Tamil Nadu
+
+The User has performed a Create Operation. User: TUser5, Email: User@test5.com, Timestamp: 2023-06-11 18:08:02, College Name: IIT Kanpur, College Location: Uttar Pradesh
+
+The User has performed a Update Operation. User: TUser5, Email: User@test5.com, Timestamp: 2023-06-11 18:11:14, College Name: IIT Kanpur, College Location: Uttar Pradesh
+
+The User has performed a Create Operation. User: TUser5, Email: User@test5.com, Timestamp: 2023-06-11 18:12:02, College Name: PES, College Location: Karnataka
+

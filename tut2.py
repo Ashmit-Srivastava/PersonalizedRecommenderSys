@@ -37,20 +37,23 @@ class users(db.Model):
         self.uuid = str(uuid.uuid4())
         self.timestamp = ""
 
-    def add_login_timestamp(self):
+    def add_login_timestamp(self, source=None):
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         if self.timestamp:
-            self.timestamp += f",{now}"
+            self.timestamp = f"{now}"
             
         else:
             self.timestamp = now
-        self.update_logs_file()  # Update the logs file immediately after adding the timestamp
+
+        if source == 'login':
+            self.update_login_logs_file()  # Update the login log file
+                
 
     def get_login_timestamps(self):
         return self.timestamp.split(",") if self.timestamp else []
 
-    def update_logs_file(self):
-        logs_file_path = os.path.join(os.path.dirname(__file__), "logs.txt")
+    def update_login_logs_file(self):
+        logs_file_path = os.path.join(os.path.dirname(__file__), "Logs/logs.txt")
         with open(logs_file_path, "a") as file:
             file.write(f"{self.name}: {self.get_login_timestamps()}\nEmail: {self.email}\n")
             
@@ -70,11 +73,12 @@ def home():
 
 @app.route("/view")
 def view_logs():
-    logs_file_path = os.path.join(app.root_path, "logs.txt")
+    email = session.get("email", "")
+    logs_file_path = os.path.join(app.root_path, "Logs/logs.txt")
     with open(logs_file_path, "r") as file:
         log_content = file.read()
 
-    return render_template("view.html", log_content=log_content)
+    return render_template("view.html", log_content=log_content, email=email)
 
 @app.route("/login", methods = ["POST", "GET"])
 def login():
@@ -83,16 +87,20 @@ def login():
         user = request.form["name"]
         session["user"] = user
 
+        email = request.form["email"]
+        session["email"] = email
+
 
         found_user = users.query.filter_by(name = user).first()
         if found_user:
             session["email"] = found_user.email
         else: 
-            usr = users(user, "")
-            db.session.add(usr)
+            found_user = users(name=user, email=email)
+            db.session.add(found_user)
+            db.session.commit()
             
         # Update the timestamp and save the details
-        found_user.add_login_timestamp()
+        found_user.add_login_timestamp('login')
         db.session.commit()
         
 
@@ -176,6 +184,13 @@ def addCollege():
     return render_template("addCdata.html", states=states)
 
 
+def update_crud_logs_file(user, email, data_dict, operation):
+    log_entry = f"The User has performed a {operation} Operation. User: {user}, Email: {email}, Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}, College Name: {data_dict['college_name']}, College Location: {data_dict['college_location']}\n\n"
+    log_file_path = os.path.join(os.path.dirname(__file__), "Logs/CRUDlog.txt")
+    with open(log_file_path, "a") as file:
+        file.write(log_entry)
+
+
 @app.route("/add_college", methods=["POST"])
 def add_college():
     if "user" in session:
@@ -195,18 +210,21 @@ def add_college():
             if existing_college:
                 existing_college.location = location
                 db.session.commit()
+                data_dict = {'college_name':college_name, 'college_location':college_location}
+                update_crud_logs_file(user=session["user"], email=session["email"], data_dict=data_dict, operation='Update')  #CRUD Operations log file update
             else:
                 iit = IIT(name=college_name, location=location)
                 db.session.add(iit)
                 db.session.commit()
+                data_dict = {'college_name':college_name, 'college_location':college_location}
+                update_crud_logs_file(user=session["user"], email=session["email"], data_dict=data_dict, operation='Create')  #CRUD Operations log file update
 
+            
             flash("College added/updated successfully!")
             return redirect(url_for("iit_list"))
     else:
         flash("You are not logged in!")
         return redirect(url_for("login"))
-
-
 
 
 @app.route("/populate_cities")
@@ -227,9 +245,6 @@ def populate_cities():
     db.session.commit()
     flash("States updated successfully!")
     return redirect(url_for("addCollege"))
-
-
-
 
 
 
